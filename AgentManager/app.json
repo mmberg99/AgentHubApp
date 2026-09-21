@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "AgentHub",
+    "slug": "agenthub",
+    "version": "1.0.0",
+    "scheme": "agenthub",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.agenthub.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-asset",
+      "expo-splash-screen",
+      "expo-status-bar"
+    ]
+  }
+}

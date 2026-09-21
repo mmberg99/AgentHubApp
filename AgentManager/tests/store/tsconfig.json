@@ -1,0 +1,24 @@
+{
+  "//": "Compiles the store, selectors, protocol and persistence layer to CommonJS so they can be tested with Node's built-in test runner. No test framework, no extra dependency. Run: npm run test:store",
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "moduleResolution": "node10",
+    "ignoreDeprecations": "6.0",
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "noEmitOnError": false,
+    "types": [],
+    "lib": ["ES2020", "DOM"],
+    "rootDir": "../../src",
+    "outDir": "./.build"
+  },
+  "files": [
+    "../../src/store/agentStore.tsx",
+    "../../src/store/selectors.ts",
+    "../../src/protocol/index.ts",
+    "../../src/services/persistence/index.ts"
+  ]
+}

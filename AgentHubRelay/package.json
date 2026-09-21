@@ -1,0 +1,19 @@
+{
+  "name": "agenthub-relay",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Windows-local Web Push relay: AgentHubNotifier -> Apple Web Push -> AgentHub PWA.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node bin/relay.mjs",
+    "generate-vapid": "node bin/generate-vapid.mjs",
+    "send-test-event": "node bin/send-test-event.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "web-push": "3.6.7"
+  }
+}

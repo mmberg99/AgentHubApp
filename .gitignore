@@ -1,0 +1,34 @@
+@'
+# Dependencies
+**/node_modules/
+
+# Generated builds
+**/build-modernized-test/
+**/dist/
+
+# Deployment backups
+PWA-*-backup/
+
+# macOS junk
+__MACOSX/
+.DS_Store
+
+# Local environment / secrets
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*vapid*.json
+*subscriptions*.json
+
+# Python junk
+__pycache__/
+*.pyc
+
+# Logs
+*.log
+'@ | Add-Content .gitignore
+# Old source backups
+AgentManager/migration-backup-before-modernization/
