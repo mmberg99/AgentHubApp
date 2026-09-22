@@ -24,8 +24,6 @@ import { createServer } from 'node:http';
 
 import { API_PORT, BIND_HOST, INGEST_PORT, INGEST_TOKEN, MAX_BODY_BYTES, MAX_MESSAGE_BODY_BYTES } from './config.mjs';
 import { conversations, parseConversationMessage } from './conversations.mjs';
-import { loadMessageSummaries } from './messageSummaries.mjs';
-import { ensureSummaryInBackground } from './summarizer.mjs';
 import { EventHistory } from './history.mjs';
 import { allowsPush, isFreshTransition, shouldPush } from './notificationPolicy.mjs';
 import { deliverToAll, isConfigured } from './push.mjs';
@@ -218,10 +216,6 @@ async function handleMessage(req, res) {
     return;
   }
   const result = await conversations.add(parsed.message);
-  // A card for this turn, prepared while the phone is still elsewhere. Fire
-  // and forget on purpose: the notifier's 202 must never wait on a provider,
-  // and a failure here changes nothing about what was just stored.
-  if (result.stored) ensureSummaryInBackground(parsed.message.taskId, parsed.message);
   sendJson(res, 202, { ok: true, stored: result.stored, duplicate: result.duplicate });
 }
 
@@ -372,23 +366,12 @@ async function handleApi(req, res) {
       sendJson(res, 401, { ok: false, error: 'unauthorized' });
       return;
     }
-    const taskId = conversationMatch[1];
-    const conv = conversations.get(taskId);
+    const conv = conversations.get(conversationMatch[1]);
     if (!conv) {
       sendJson(res, 404, { ok: false, error: 'not found' });
       return;
     }
-    // Cards are sent alongside the messages they preview. Whatever is missing
-    // is generated in the background, so a first open is never slowed down and
-    // a task captured before summarisation existed fills in as it is read.
-    const summaries = loadMessageSummaries(taskId);
-    const threads = [conv.thread, ...Object.values(conv.children)];
-    for (const thread of threads) {
-      for (const message of thread.messages) {
-        if (!summaries[message.messageId]) ensureSummaryInBackground(taskId, message);
-      }
-    }
-    sendJson(res, 200, { ok: true, conversation: { ...conv, summaries } });
+    sendJson(res, 200, { ok: true, conversation: conv });
     return;
   }
 

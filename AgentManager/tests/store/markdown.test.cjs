@@ -14,12 +14,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 const BUILD = path.join(__dirname, '.build');
-const {
-  parseMarkdownBlocks,
-  parseInline,
-  safeHref,
-  truncateMarkdown,
-} = require(path.join(BUILD, 'lib', 'markdown.js'));
+const { parseMarkdownBlocks, parseInline, safeHref } = require(path.join(BUILD, 'lib', 'markdown.js'));
 
 /** Flattened plain text of a span list, ignoring styling. */
 const plain = (spans) => spans.map((s) => s.text).join('');
@@ -244,18 +239,4 @@ test('a realistic Claude answer produces every supported block', () => {
   assert.equal(rendered[3].ordered, true);
   assert.equal(rendered[4].text, 'npm test');
   assert.equal(plain(rendered[5].spans), 'All 74 tests pass.');
-});
-
-/* -------------------------------------------------------------- truncation */
-
-test('collapsing prefers a line boundary and never invents content', () => {
-  const src = 'line one\nline two\nline three\nline four';
-  const short = truncateMarkdown(src, 1000);
-  assert.equal(short.truncated, false);
-  assert.equal(short.text, src);
-
-  const cut = truncateMarkdown(src, 20);
-  assert.equal(cut.truncated, true);
-  assert.ok(src.startsWith(cut.text.replace('…', '')));
-  assert.ok(cut.text.length <= 21);
 });

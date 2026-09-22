@@ -1,10 +1,9 @@
-import React, { useMemo, useState } from 'react';
-import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
   parseMarkdownBlocks,
   safeHref,
-  truncateMarkdown,
   type MarkdownBlock,
   type MarkdownSpan,
 } from '../lib/markdown';
@@ -174,48 +173,6 @@ export function Markdown({ source, color }: { source: string; color?: string }) 
       {blocks.map((block, index) => (
         <Block key={index} block={block} color={color} />
       ))}
-    </View>
-  );
-}
-
-/**
- * Markdown with the same collapse behaviour as `ExpandableText`: long output
- * is cut at a line boundary so a fence or list is not split mid-token, and the
- * full text is always one tap away. Nothing is hidden permanently.
- */
-export function ExpandableMarkdown({
-  text,
-  limit = 700,
-  color,
-}: {
-  text: string;
-  limit?: number;
-  color?: string;
-}) {
-  const theme = useTheme();
-  const [expanded, setExpanded] = useState(false);
-  const { text: shown, truncated } = useMemo(
-    () => (expanded ? { text, truncated: false } : truncateMarkdown(text, limit)),
-    [text, limit, expanded],
-  );
-  const overflows = text.length > limit;
-
-  return (
-    <View>
-      <Markdown source={shown} color={color} />
-      {overflows ? (
-        <Pressable
-          onPress={() => setExpanded((value) => !value)}
-          accessibilityRole="button"
-          hitSlop={8}
-          style={{ alignSelf: 'flex-start', marginTop: 6 }}
-        >
-          <Text style={[theme.typography.captionStrong, { color: theme.colors.accent }]}>
-            {expanded ? 'Show less' : `Show more (${text.length.toLocaleString()} characters)`}
-          </Text>
-        </Pressable>
-      ) : null}
-      {truncated ? null : null}
     </View>
   );
 }

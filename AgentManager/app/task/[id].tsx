@@ -6,9 +6,8 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import {
   Button,
   Card,
+  CollapsibleMessage,
   EmptyState,
-  ExpandableMarkdown,
-  ExpandableText,
   MessageBubble,
   Screen,
   SectionHeader,
@@ -28,13 +27,14 @@ import {
   findTask,
   latestOutputFor,
   statusLabel,
+  summaryFor,
   subtaskTitle,
   subtasksFor,
   useAgentStore,
   visualStateFor,
 } from '../../src/store';
 import { useTheme } from '../../src/theme';
-import type { ConversationMessage } from '../../src/protocol';
+import type { ConversationMessage, MessageSummary } from '../../src/protocol';
 import type { AgentEvent, Subtask } from '../../src/types';
 
 /** Only an https URL may be opened. Anything else keeps Open Chat disabled. */
@@ -259,7 +259,12 @@ export default function TaskDetailScreen() {
           <View style={styles.section}>
             <SectionHeader title="Latest output" />
             <Card>
-              <ExpandableMarkdown text={latestOutput.text} limit={900} />
+              <CollapsibleMessage
+                text={latestOutput.text}
+                role="assistant"
+                summary={summaryFor(conversations, taskId, latestOutput.messageId)}
+                variant="plain"
+              />
               <Text style={[theme.typography.caption, { color: theme.colors.textTertiary, marginTop: 10 }]}>
                 {clockTime(latestOutput.timestamp)} · {relativeTime(latestOutput.timestamp)} ago
                 {latestOutput.truncated ? ' · cut at the sender\'s size limit' : ''}
@@ -283,7 +288,12 @@ export default function TaskDetailScreen() {
           ) : (
             <View>
               {thread.map((message, index) => (
-                <MessageBubble key={message.messageId} message={message} isLast={index === thread.length - 1} />
+                <MessageBubble
+                  key={message.messageId}
+                  message={message}
+                  summary={summaryFor(conversations, taskId, message.messageId)}
+                  isLast={index === thread.length - 1}
+                />
               ))}
             </View>
           )}
@@ -301,6 +311,7 @@ export default function TaskDetailScreen() {
                   subtask={child}
                   output={childOutputFor(conversations, taskId, child.id)}
                   messages={childConversationFor(conversations, taskId, child.id)}
+                  summaries={conversations[taskId]?.summaries ?? {}}
                   isLast={index === children.length - 1}
                 />
               ))}
@@ -492,11 +503,14 @@ function SubtaskRow({
   subtask,
   output,
   messages,
+  summaries,
   isLast,
 }: {
   subtask: Subtask;
   output: ConversationMessage | null;
   messages: ConversationMessage[];
+  /** Cards for this child's own messages, looked up by messageId. */
+  summaries: Record<string, MessageSummary>;
   isLast: boolean;
 }) {
   const theme = useTheme();
@@ -544,7 +558,13 @@ function SubtaskRow({
                 Instructions
               </Text>
               {prompts.map((m) => (
-                <ExpandableText key={m.messageId} text={m.text} limit={400} color={theme.colors.textSecondary} />
+                <CollapsibleMessage
+                  key={m.messageId}
+                  text={m.text}
+                  role="user"
+                  summary={summaries[m.messageId] ?? null}
+                  variant="plain"
+                />
               ))}
             </View>
           ) : null}
@@ -552,7 +572,12 @@ function SubtaskRow({
             Output
           </Text>
           {output ? (
-            <ExpandableMarkdown text={output.text} limit={600} />
+            <CollapsibleMessage
+              text={output.text}
+              role="assistant"
+              summary={summaries[output.messageId] ?? null}
+              variant="plain"
+            />
           ) : (
             <Text style={[theme.typography.caption, { color: theme.colors.textTertiary }]}>
               {subtask.status === 'completed'

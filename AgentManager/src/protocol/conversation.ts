@@ -40,6 +40,27 @@ export interface ConversationThread {
   agentType?: string;
 }
 
+/**
+ * The collapsed card for one message, written on Windows.
+ *
+ * This is presentation metadata, never a replacement: the message it previews
+ * is served unchanged beside it, and expanding a card always renders that
+ * original text. A card may be absent for any reason at all, in which case the
+ * app falls back to the local preview generator in `lib/messagePreview.ts`.
+ *
+ * Treated as untrusted display text like everything else from the wire: it is
+ * rendered as plain text, so a URL inside a summary is not tappable.
+ */
+export interface MessageSummary {
+  messageId: string;
+  title: string;
+  style: 'bullets' | 'paragraph';
+  /** Set when `style` is 'paragraph'. */
+  paragraph: string;
+  /** Set when `style` is 'bullets'. Length is the writer's choice, not capped here. */
+  bullets: string[];
+}
+
 export interface TaskConversation {
   taskId: string;
   /** Derived from the first main prompt on Windows; never rewritten. */
@@ -48,6 +69,8 @@ export interface TaskConversation {
   thread: ConversationThread;
   /** subtaskId -> that child's own thread. Never merged into `thread`. */
   children: Record<string, ConversationThread>;
+  /** messageId -> its card. Empty when summarisation is off or not done yet. */
+  summaries: Record<string, MessageSummary>;
 }
 
 export interface ConversationSummary {
@@ -119,6 +142,43 @@ function parseThread(input: unknown): ConversationThread {
   return thread;
 }
 
+const MAX_SUMMARY_TITLE = 80;
+const MAX_SUMMARY_BULLET = 200;
+const MAX_SUMMARY_PARAGRAPH = 600;
+
+function cleanLine(value: unknown, max: number): string {
+  if (typeof value !== 'string') return '';
+  return value.replace(CONTROL, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+/** Rebuilds a card from known fields only; anything unusable becomes null. */
+export function parseMessageSummary(input: unknown): MessageSummary | null {
+  if (typeof input !== 'object' || input === null) return null;
+  const s = input as Record<string, unknown>;
+  if (!isId(s.messageId)) return null;
+  if (s.style !== 'bullets' && s.style !== 'paragraph') return null;
+
+  const title = cleanLine(s.title, MAX_SUMMARY_TITLE);
+  if (title.length === 0) return null;
+
+  const bullets = Array.isArray(s.bullets)
+    ? s.bullets.map((b) => cleanLine(b, MAX_SUMMARY_BULLET)).filter((b) => b.length > 0)
+    : [];
+  const paragraph = cleanLine(s.paragraph, MAX_SUMMARY_PARAGRAPH);
+
+  // A card must say something in the style it claims, or it is not a card.
+  if (s.style === 'bullets' && bullets.length === 0) return null;
+  if (s.style === 'paragraph' && paragraph.length === 0) return null;
+
+  return {
+    messageId: s.messageId,
+    title,
+    style: s.style,
+    paragraph: s.style === 'paragraph' ? paragraph : '',
+    bullets: s.style === 'bullets' ? bullets : [],
+  };
+}
+
 /** Validates a `GET /conversation/<id>` body. Untrusted in, typed out. */
 export function parseTaskConversation(input: unknown): TaskConversation | null {
   if (typeof input !== 'object' || input === null) return null;
@@ -130,10 +190,19 @@ export function parseTaskConversation(input: unknown): TaskConversation | null {
     updatedAt: isIso(c.updatedAt) ? new Date(c.updatedAt).toISOString() : new Date(0).toISOString(),
     thread: parseThread(c.thread),
     children: {},
+    summaries: {},
   };
   if (typeof c.children === 'object' && c.children !== null) {
     for (const [id, child] of Object.entries(c.children as Record<string, unknown>)) {
       if (isId(id)) out.children[id] = parseThread(child);
+    }
+  }
+  if (typeof c.summaries === 'object' && c.summaries !== null) {
+    for (const [id, entry] of Object.entries(c.summaries as Record<string, unknown>)) {
+      const summary = parseMessageSummary(entry);
+      // The key must be the message the card belongs to; a mismatch is dropped
+      // rather than risking a card shown against the wrong message.
+      if (isId(id) && summary && summary.messageId === id) out.summaries[id] = summary;
     }
   }
   return out;

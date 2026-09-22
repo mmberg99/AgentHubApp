@@ -1,5 +1,10 @@
 import { isToday } from '../lib/time';
-import { latestAssistantMessage, type ConversationMessage, type TaskConversation } from '../protocol';
+import {
+  latestAssistantMessage,
+  type ConversationMessage,
+  type MessageSummary,
+  type TaskConversation,
+} from '../protocol';
 import type {
   Agent,
   AgentEvent,
@@ -277,6 +282,20 @@ export function childConversationFor(
   subtaskId: string,
 ): ConversationMessage[] {
   return conversations[taskId]?.children[subtaskId]?.messages ?? [];
+}
+
+/**
+ * The card written on Windows for one message, or null when there is none.
+ * Both Conversation and Latest output look a message up here, so the same
+ * message is never previewed two different ways.
+ */
+export function summaryFor(
+  conversations: Record<string, TaskConversation>,
+  taskId: string,
+  messageId: string | undefined,
+): MessageSummary | null {
+  if (!messageId) return null;
+  return conversations[taskId]?.summaries[messageId] ?? null;
 }
 
 /** A subagent's final visible output (its newest assistant message). */

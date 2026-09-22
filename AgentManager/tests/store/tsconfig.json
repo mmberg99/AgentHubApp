@@ -21,6 +21,7 @@
     "../../src/protocol/index.ts",
     "../../src/services/persistence/index.ts",
     "../../src/lib/markdown.ts",
+    "../../src/lib/messagePreview.ts",
     "../../src/lib/notificationPreferences.ts"
   ]
 }

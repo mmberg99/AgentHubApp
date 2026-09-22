@@ -3,6 +3,7 @@ import {
   type AgentNotificationEvent,
   type AgentEventType,
   type ConversationMessage,
+  type MessageSummary,
   type TaskConversation,
 } from '../../protocol';
 import type {
@@ -277,7 +278,16 @@ export function currentSimulatedTaskId(): string | null {
 
 const SAMPLE_TURNS: ReadonlyArray<readonly [string, string]> = [
   [
-    'Fix the push notification lifecycle so Claude is idle while background tests are still running',
+    [
+      'Fix the push notification lifecycle so Claude is idle while background tests are still running.',
+      '',
+      '- Stop with outstanding work should report Idle',
+      '- Stop with nothing outstanding should report Completed',
+      '- Do not change the existing push policy',
+      '- Add tests covering both paths',
+      '',
+      'Build and stage it, then stop for approval before deploying anything.',
+    ].join('\n'),
     [
       '## Summary',
       '',
@@ -332,15 +342,56 @@ export function buildSimulatedConversation(
     text,
     timestamp: new Date(now + offset).toISOString(),
   });
-  const messages = [...prior, mk('user', turn[0], 0), mk('assistant', turn[1], 1)];
+  const nextUser = mk('user', turn[0], 0);
+  const nextAssistant = mk('assistant', turn[1], 1);
+  const messages = [...prior, nextUser, nextAssistant];
+
+  // Stand-ins for the cards the Windows summariser writes, so the simulate
+  // controls exercise the same rendering path a real summary uses. Local
+  // only; nothing is sent anywhere and no model is called.
+  const card = (message: ConversationMessage, index: number): MessageSummary | null =>
+    SAMPLE_CARDS[index] ? { ...SAMPLE_CARDS[index], messageId: message.messageId } : null;
+  const summaries: Record<string, MessageSummary> = { ...(existing?.summaries ?? {}) };
+  const turnIndex = Math.floor(prior.length / 2) % SAMPLE_TURNS.length;
+  const userCard = card(nextUser, turnIndex * 2);
+  const assistantCard = card(nextAssistant, turnIndex * 2 + 1);
+  if (userCard) summaries[nextUser.messageId] = userCard;
+  if (assistantCard) summaries[nextAssistant.messageId] = assistantCard;
+
   return {
     taskId,
     title: existing?.title ?? 'Fix push notification lifecycle',
     updatedAt: new Date(now + 1).toISOString(),
     thread: { messages, trimmed: 0 },
     children: existing?.children ?? {},
+    summaries,
   };
 }
+
+/**
+ * Sample cards paired with SAMPLE_TURNS, in prompt/response order. Only the
+ * first pair has them, so the simulate controls show both an AI card and the
+ * local fallback side by side.
+ */
+const SAMPLE_CARDS: ReadonlyArray<Omit<MessageSummary, 'messageId'> | null> = [
+  // The long prompt deliberately has no card, so the simulate controls show
+  // the Windows-written card and the local fallback next to each other.
+  null,
+  {
+    title: 'Corrected lifecycle implemented',
+    style: 'bullets',
+    paragraph: '',
+    bullets: [
+      'Stop now reports Idle while work is outstanding',
+      'hook_context.py classifies the stop, notificationPolicy.mjs decides the push',
+      'All suites pass',
+    ],
+  },
+  null,
+  null,
+  null,
+  null,
+];
 
 /** Builds a protocol-valid event for local testing. */
 export function buildSimulatedEvent(key: SimulatedEventKey): AgentNotificationEvent {

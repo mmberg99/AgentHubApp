@@ -11,8 +11,7 @@
     "start": "node bin/relay.mjs",
     "generate-vapid": "node bin/generate-vapid.mjs",
     "send-test-event": "node bin/send-test-event.mjs",
-    "test": "node --test test/*.test.mjs",
-    "set-summarizer-key": "node bin/set-summarizer-key.mjs"
+    "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "web-push": "3.6.7"

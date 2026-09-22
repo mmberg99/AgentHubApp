@@ -277,15 +277,3 @@ export function parseMarkdownBlocks(source: string): MarkdownBlock[] {
 
   return blocks;
 }
-
-/**
- * Shortens Markdown source for a collapsed view, preferring a line boundary so
- * a fence or list is not cut mid-token. Returns the original when it fits.
- */
-export function truncateMarkdown(source: string, limit: number): { text: string; truncated: boolean } {
-  if (source.length <= limit) return { text: source, truncated: false };
-  const cut = source.slice(0, limit);
-  const lastBreak = cut.lastIndexOf('\n');
-  const text = lastBreak > limit * 0.5 ? cut.slice(0, lastBreak) : cut;
-  return { text: `${text.trimEnd()}…`, truncated: true };
-}

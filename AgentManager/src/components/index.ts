@@ -3,6 +3,7 @@ export * from './ApprovalCard';
 export * from './Avatar';
 export * from './Button';
 export * from './Card';
+export * from './CollapsibleMessage';
 export * from './EmptyState';
 export * from './EventRow';
 export * from './FilterBar';
