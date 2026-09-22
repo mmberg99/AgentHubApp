@@ -94,22 +94,6 @@ export function isSubtaskEvent(event) {
 }
 
 /**
- * Per-device delivery filter, applied after `shouldPush` and
- * `isFreshTransition` have already decided the event is push-worthy.
- *
- * The ONLY thing a preference can suppress is a subagent's completion. A
- * child that needs approval or input, a child failure, and every main-task
- * notification are unaffected, because those are the ones that need the user.
- * Suppressing here, per subscription, keeps the event, its history and the
- * task hierarchy exactly as they are: only the push is withheld.
- */
-export function allowsPush(record, event) {
-  const isSubtaskCompletion = isSubtaskEvent(event) && event.type === 'completed';
-  if (!isSubtaskCompletion) return true;
-  return record?.preferences?.subtaskCompletionPush !== false;
-}
-
-/**
  * The only text permitted to reach a lock screen.
  *
  * `title` is the agent's name (operator-chosen, already length-capped and

@@ -126,36 +126,9 @@ export function tokenMatchesHash(token, expectedHash) {
   return timingSafeEqual(actual, expected);
 }
 
-/**
- * Per-device notification preferences.
- *
- * Chosen on the phone, stored beside that device's subscription because the
- * push decision is made here, on Windows: the phone cannot suppress a push
- * after the fact without breaking the service worker's userVisibleOnly
- * contract. Defaults are ON, so a device that never expressed a preference,
- * or whose record predates this field, keeps the previous behaviour.
- *
- * These are display preferences only. They never widen what is delivered,
- * only narrow it, and they carry no identity of any kind.
- */
-export const DEFAULT_PREFERENCES = Object.freeze({ subtaskCompletionPush: true });
-
-/** Rebuilds preferences from known keys only; anything else is discarded. */
-export function sanitizePreferences(value) {
-  const out = { ...DEFAULT_PREFERENCES };
-  if (typeof value !== 'object' || value === null) return out;
-  if (typeof value.subtaskCompletionPush === 'boolean') {
-    out.subtaskCompletionPush = value.subtaskCompletionPush;
-  }
-  return out;
-}
-
 export function loadSubscriptions() {
   const data = readJson(SUBSCRIPTIONS_FILE, []);
-  if (!Array.isArray(data)) return [];
-  return data
-    .filter(isStoredSubscription)
-    .map((s) => ({ ...s, preferences: sanitizePreferences(s.preferences) }));
+  return Array.isArray(data) ? data.filter(isStoredSubscription) : [];
 }
 
 function isStoredSubscription(value) {
@@ -190,8 +163,6 @@ export async function upsertSubscription({ endpoint, p256dh, auth }) {
       tokenHash: hashToken(token),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
-      // Re-registering the same device keeps its notification preferences.
-      preferences: sanitizePreferences(existing?.preferences),
     };
     const next = all.filter((s) => s.endpoint !== endpoint);
     next.push(record);
@@ -209,30 +180,6 @@ export async function removeSubscription(endpoint) {
     const next = loadSubscriptions().filter((s) => s.endpoint !== endpoint);
     writeJsonAtomic(SUBSCRIPTIONS_FILE, next);
   });
-}
-
-/**
- * Update the notification preferences of the device that presents `token`.
- *
- * Authenticated by the same per-device capability token that guards /history
- * and the conversation reads: a caller without it changes nothing. Returns the
- * stored preferences, or null when no subscription matches.
- */
-export async function setPreferencesForToken(token, preferences) {
-  const clean = sanitizePreferences(preferences);
-  let matched = false;
-
-  await enqueueWrite(() => {
-    const all = loadSubscriptions();
-    const next = all.map((record) => {
-      if (!tokenMatchesHash(token, record.tokenHash ?? '')) return record;
-      matched = true;
-      return { ...record, preferences: clean, updatedAt: new Date().toISOString() };
-    });
-    if (matched) writeJsonAtomic(SUBSCRIPTIONS_FILE, next);
-  });
-
-  return matched ? clean : null;
 }
 
 /**

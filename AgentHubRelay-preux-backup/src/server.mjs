@@ -25,14 +25,9 @@ import { createServer } from 'node:http';
 import { API_PORT, BIND_HOST, INGEST_PORT, INGEST_TOKEN, MAX_BODY_BYTES, MAX_MESSAGE_BODY_BYTES } from './config.mjs';
 import { conversations, parseConversationMessage } from './conversations.mjs';
 import { EventHistory } from './history.mjs';
-import { allowsPush, isFreshTransition, shouldPush } from './notificationPolicy.mjs';
+import { isFreshTransition, shouldPush } from './notificationPolicy.mjs';
 import { deliverToAll, isConfigured } from './push.mjs';
-import {
-  findByCapabilityToken,
-  loadSubscriptions,
-  setPreferencesForToken,
-  upsertSubscription,
-} from './storage.mjs';
+import { findByCapabilityToken, loadSubscriptions, upsertSubscription } from './storage.mjs';
 import { parseAgentNotificationEvent } from './validateAgentEvent.mjs';
 
 export const history = new EventHistory();
@@ -185,12 +180,10 @@ async function handleIngest(req, res) {
   // a fresh transition (one push per completion, never a repeat).
   const pushed = shouldPush(parsed.event.type) && isFreshTransition(parsed.event.type, previousType);
 
-  // Per-device preferences narrow the audience; they never widen it.
   const subscriptions = loadSubscriptions();
-  const targets = subscriptions.filter((record) => allowsPush(record, parsed.event));
   let delivery = { sent: 0, failed: 0, pruned: 0 };
-  if (pushed && isConfigured() && targets.length > 0) {
-    delivery = await deliverToAll(parsed.event, targets);
+  if (pushed && isConfigured() && subscriptions.length > 0) {
+    delivery = await deliverToAll(parsed.event, subscriptions);
   }
 
   // Small status only, as specified. Nothing about the event is reflected back.
@@ -260,51 +253,6 @@ async function handleRegister(req, res) {
   sendJson(res, 200, { ok: true, historyToken: token });
 }
 
-/**
- * POST /push/preferences — this device's notification preferences.
- *
- * Requires the device's own capability token, the same credential that guards
- * /history and the conversation reads, so an unauthenticated caller can change
- * nothing. The body is an allow-list of one boolean; unknown fields are
- * ignored and nothing here can widen delivery.
- */
-async function handlePreferences(req, res) {
-  const record = findByCapabilityToken(bearerToken(req) ?? '');
-  if (!record) {
-    sendJson(res, 401, { ok: false, error: 'unauthorized' });
-    return;
-  }
-
-  const body = await readJsonBody(req);
-  if (!body.ok) {
-    sendJson(res, body.tooLarge ? 413 : 400, { ok: false, error: body.error });
-    return;
-  }
-
-  const value = body.value;
-  if (typeof value !== 'object' || value === null || value.version !== 1) {
-    sendJson(res, 422, { ok: false, error: 'validation failed', reasons: ['"version" must be 1'] });
-    return;
-  }
-  if (typeof value.subtaskCompletionPush !== 'boolean') {
-    sendJson(res, 422, {
-      ok: false,
-      error: 'validation failed',
-      reasons: ['"subtaskCompletionPush" must be a boolean'],
-    });
-    return;
-  }
-
-  const saved = await setPreferencesForToken(bearerToken(req) ?? '', {
-    subtaskCompletionPush: value.subtaskCompletionPush,
-  });
-  if (!saved) {
-    sendJson(res, 401, { ok: false, error: 'unauthorized' });
-    return;
-  }
-  sendJson(res, 200, { ok: true, preferences: saved });
-}
-
 /** GET /history?since=N — requires that device's capability token. */
 function handleHistory(req, res, url) {
   const token = bearerToken(req);
@@ -327,19 +275,6 @@ async function handleApi(req, res) {
 
   if (path === '/push/register' && req.method === 'POST') {
     await handleRegister(req, res);
-    return;
-  }
-  if (path === '/push/preferences' && req.method === 'POST') {
-    await handlePreferences(req, res);
-    return;
-  }
-  if (path === '/push/preferences' && req.method === 'GET') {
-    const record = findByCapabilityToken(bearerToken(req) ?? '');
-    if (!record) {
-      sendJson(res, 401, { ok: false, error: 'unauthorized' });
-      return;
-    }
-    sendJson(res, 200, { ok: true, preferences: record.preferences });
     return;
   }
   if (path === '/history' && req.method === 'GET') {

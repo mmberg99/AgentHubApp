@@ -4,6 +4,7 @@ export * from './mockNotificationService';
 export * from './NotificationBridge';
 export * from './notificationPolicy';
 export * from './notificationService';
+export * from './preferencesSync';
 export * from './pushPayload';
 export * from './types';
 export * from './webPushNotificationService';

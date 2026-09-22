@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { clockTime } from '../lib/time';
+import { ExpandableMarkdown } from './Markdown';
 import type { ConversationMessage } from '../protocol';
 import { useTheme } from '../theme';
 
@@ -74,7 +75,8 @@ export function MessageBubble({ message, isLast = false }: { message: Conversati
             {clockTime(message.timestamp)}
           </Text>
         </View>
-        <ExpandableText text={message.text} />
+        {/* Claude's text is Markdown; the user's own prompt is shown as typed. */}
+        {mine ? <ExpandableText text={message.text} /> : <ExpandableMarkdown text={message.text} />}
         {message.truncated ? (
           <Text style={[theme.typography.caption, { color: theme.colors.attention, marginTop: 6 }]}>
             Cut at the sender's size limit; the full text was longer.

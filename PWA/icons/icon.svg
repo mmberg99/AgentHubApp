@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AgentHub icon master.
+
+  A hub with three agents orbiting it; one is amber, echoing the app's single
+  "needs attention" accent. Colours are taken from the app theme:
+    surface #14141A, accent #8B85F5, muted #6E6E7A, attention #E3A857.
+
+  This SVG is the source of truth. The PNGs beside it are derived from it, so
+  regenerate them after any edit (see scripts/README or the build notes).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#14141A"/>
+  <g stroke="#2E2E38" stroke-width="12" stroke-linecap="round">
+    <line x1="256" y1="256" x2="256" y2="132"/>
+    <line x1="256" y1="256" x2="363" y2="318"/>
+    <line x1="256" y1="256" x2="149" y2="318"/>
+  </g>
+  <circle cx="256" cy="256" r="58" fill="#8B85F5"/>
+  <circle cx="256" cy="132" r="34" fill="#E3A857"/>
+  <circle cx="363" cy="318" r="34" fill="#6E6E7A"/>
+  <circle cx="149" cy="318" r="34" fill="#6E6E7A"/>
+</svg>

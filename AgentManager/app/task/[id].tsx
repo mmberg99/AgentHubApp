@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -7,6 +7,7 @@ import {
   Button,
   Card,
   EmptyState,
+  ExpandableMarkdown,
   ExpandableText,
   MessageBubble,
   Screen,
@@ -18,11 +19,11 @@ import {
 import { useTaskConversation } from '../../src/services/conversation';
 import { eventMeta } from '../../src/lib/eventMeta';
 import { clockTime, relativeTime, shortDate } from '../../src/lib/time';
-import { getPromptSender } from '../../src/services/prompt';
+import { CLAUDE_CODE_URL, openClaudeCode } from '../../src/services/remoteControl';
 import {
   childConversationFor,
   childOutputFor,
-  conversationFor,
+  conversationForDisplay,
   eventsForTask,
   findTask,
   latestOutputFor,
@@ -69,16 +70,15 @@ export default function TaskDetailScreen() {
   // The user-visible conversation lives on Windows; fetch it for this task on
   // open and whenever the task's activity changes.
   useTaskConversation(taskId, task?.updatedAt);
-  const thread = conversationFor(conversations, taskId);
+  // Newest first: the latest turn sits at the top of the Conversation card.
+  const thread = conversationForDisplay(conversations, taskId);
   const latestOutput = latestOutputFor(conversations, taskId);
 
   /* ---------------------------------------------------- local field state */
 
   const [title, setTitle] = useState(meta.customTitle ?? '');
   const [chatUrl, setChatUrl] = useState(meta.chatUrl ?? '');
-  const [draft, setDraft] = useState(meta.promptDraft ?? '');
   const [notice, setNotice] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
   const [confirmForget, setConfirmForget] = useState(false);
   /** Set the instant Forget is confirmed, so the "not found" view never flashes. */
   const [forgetting, setForgetting] = useState(false);
@@ -88,26 +88,10 @@ export default function TaskDetailScreen() {
   useEffect(() => {
     setTitle(meta.customTitle ?? '');
     setChatUrl(meta.chatUrl ?? '');
-    setDraft(meta.promptDraft ?? '');
     setNotice(null);
     // Only when the task changes; the fields are the source of truth while typing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId]);
-
-  // Autosave the prompt draft as it is typed (debounced), so leaving the
-  // screen or closing the app never loses it.
-  const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (!task) return;
-    if (draftTimer.current) clearTimeout(draftTimer.current);
-    draftTimer.current = setTimeout(() => {
-      if ((meta.promptDraft ?? '') !== draft) setTaskMeta(task.id, { promptDraft: draft });
-    }, 500);
-    return () => {
-      if (draftTimer.current) clearTimeout(draftTimer.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft]);
 
   if (forgetting) {
     // Navigation away is already in flight; render nothing meanwhile.
@@ -135,7 +119,6 @@ export default function TaskDetailScreen() {
   const finished = state === 'finished' && !accepted;
   const chatUrlValid = isHttpsUrl(chatUrl);
   const savedChatValid = Boolean(meta.chatUrl && isHttpsUrl(meta.chatUrl));
-  const sender = getPromptSender();
 
   /* -------------------------------------------------------------- actions */
 
@@ -171,21 +154,6 @@ export default function TaskDetailScreen() {
     if (router.canGoBack()) router.back();
     else router.replace('/');
     forgetTask(id);
-  };
-
-  const sendPrompt = async () => {
-    const prompt = draft.trim();
-    if (!prompt) return;
-    setSending(true);
-    setTaskMeta(task.id, { promptDraft: draft });
-    const result = await sender.send({
-      taskId: task.id,
-      projectId: task.projectId,
-      agentId: task.agentId,
-      prompt,
-    });
-    setSending(false);
-    setNotice(result.message);
   };
 
   /* ------------------------------------------------------------ rendering */
@@ -291,7 +259,7 @@ export default function TaskDetailScreen() {
           <View style={styles.section}>
             <SectionHeader title="Latest output" />
             <Card>
-              <ExpandableText text={latestOutput.text} limit={900} />
+              <ExpandableMarkdown text={latestOutput.text} limit={900} />
               <Text style={[theme.typography.caption, { color: theme.colors.textTertiary, marginTop: 10 }]}>
                 {clockTime(latestOutput.timestamp)} · {relativeTime(latestOutput.timestamp)} ago
                 {latestOutput.truncated ? ' · cut at the sender\'s size limit' : ''}
@@ -349,46 +317,36 @@ export default function TaskDetailScreen() {
           </View>
         ) : null}
 
-        {/* Follow-up prompt: finished tasks only */}
-        {finished ? (
-          <View style={styles.section}>
-            <SectionHeader title="Follow-up prompt" />
-            <Card padded={false}>
-              <TextInput
-                value={draft}
-                onChangeText={setDraft}
-                placeholder="What should the agent do next?"
-                placeholderTextColor={theme.colors.textTertiary}
-                multiline
-                style={[theme.typography.body, styles.multiline, { color: theme.colors.text }]}
-                accessibilityLabel="Follow-up prompt"
-              />
-              <View style={styles.cardActions}>
-                <Text
-                  style={[theme.typography.caption, { color: theme.colors.textTertiary, flex: 1 }]}
-                >
-                  {draft.trim().length > 0 ? 'Draft saved on this device.' : ''}
-                </Text>
-                <Button
-                  label={sender.configured ? 'Send to agent' : 'Send to agent (not configured)'}
-                  icon="arrow-up"
-                  variant={sender.configured ? 'primary' : 'secondary'}
-                  onPress={() => void sendPrompt()}
-                  disabled={draft.trim().length === 0}
-                  loading={sending}
-                />
-              </View>
-            </Card>
+        {/* Continue in Claude: hand-off to Claude Remote Control. AgentHub
+            sends nothing; the user picks the session in Claude's own list. */}
+        <View style={styles.section}>
+          <Card>
+            <Button
+              label="Continue in Claude"
+              icon="open-outline"
+              variant="primary"
+              onPress={() => void openClaudeCode()}
+              fill
+            />
             <Text
               style={[
                 theme.typography.caption,
-                { color: theme.colors.textTertiary, marginTop: 8, lineHeight: 18 },
+                { color: theme.colors.textSecondary, marginTop: 12, lineHeight: 18 },
               ]}
             >
-              {sender.description}
+              Continue this task using Claude Remote Control.
             </Text>
-          </View>
-        ) : null}
+            <Text
+              style={[
+                theme.typography.caption,
+                { color: theme.colors.textTertiary, marginTop: 4, lineHeight: 18 },
+              ]}
+            >
+              Opens Claude&apos;s Code session list ({CLAUDE_CODE_URL.replace('https://', '')}). Choose the
+              session for this task or project. AgentHub itself sends nothing to Claude.
+            </Text>
+          </Card>
+        </View>
 
         {/* ChatGPT link: all tasks */}
         <View style={styles.section}>
@@ -521,7 +479,7 @@ export default function TaskDetailScreen() {
               { color: theme.colors.textTertiary, marginTop: 8, lineHeight: 18 },
             ]}
           >
-            Removes this task, its ChatGPT link, draft and accepted state from this device only.
+            Removes this task, its ChatGPT link and accepted state from this device only.
             Other tasks, notifications and push registration are untouched.
           </Text>
         </View>
@@ -594,7 +552,7 @@ function SubtaskRow({
             Output
           </Text>
           {output ? (
-            <ExpandableText text={output.text} limit={600} />
+            <ExpandableMarkdown text={output.text} limit={600} />
           ) : (
             <Text style={[theme.typography.caption, { color: theme.colors.textTertiary }]}>
               {subtask.status === 'completed'
@@ -689,14 +647,6 @@ const styles = StyleSheet.create({
   section: {
     marginTop: 12,
     marginBottom: 12,
-  },
-  multiline: {
-    minHeight: 96,
-    maxHeight: 220,
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: 6,
-    textAlignVertical: 'top',
   },
   input: {
     minHeight: 44,

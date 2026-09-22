@@ -231,12 +231,32 @@ export function externalEvents(events: AgentEvent[]): AgentEvent[] {
 /* Conversation selectors                                                      */
 /* -------------------------------------------------------------------------- */
 
-/** The task's own visible turns, oldest first. Children are never mixed in. */
+/**
+ * The task's own visible turns in CHRONOLOGICAL order, oldest first. Children
+ * are never mixed in. This is the stored order, unchanged: the relay's files
+ * and the fetched payload keep it, and "Latest output" reads the newest
+ * assistant turn from it.
+ */
 export function conversationFor(
   conversations: Record<string, TaskConversation>,
   taskId: string,
 ): ConversationMessage[] {
   return conversations[taskId]?.thread.messages ?? [];
+}
+
+/**
+ * The same turns in DISPLAY order, newest first.
+ *
+ * The phone shows the latest activity at the top of the Conversation section,
+ * so a reply that arrives while the screen is open appears where the user is
+ * already looking, with no scrolling. This is presentation only: it reverses a
+ * copy and leaves storage, persistence and message identity untouched.
+ */
+export function conversationForDisplay(
+  conversations: Record<string, TaskConversation>,
+  taskId: string,
+): ConversationMessage[] {
+  return [...conversationFor(conversations, taskId)].reverse();
 }
 
 /**

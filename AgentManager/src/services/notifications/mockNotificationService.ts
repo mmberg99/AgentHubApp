@@ -278,15 +278,38 @@ export function currentSimulatedTaskId(): string | null {
 const SAMPLE_TURNS: ReadonlyArray<readonly [string, string]> = [
   [
     'Fix the push notification lifecycle so Claude is idle while background tests are still running',
-    'Implemented the corrected lifecycle: Stop with outstanding background work now reports Idle, and only a Stop with nothing outstanding reports Completed.\n\nAll suites pass.',
+    [
+      '## Summary',
+      '',
+      'Implemented the **corrected lifecycle**. `Stop` with work outstanding now reports *Idle*,',
+      'and only a `Stop` with nothing outstanding reports **Completed**.',
+      '',
+      '- `hook_context.py` classifies the stop',
+      '- `notificationPolicy.mjs` decides the push',
+      '',
+      '```ts',
+      'const state = outstanding ? "idle" : "completed";',
+      '// markup in code stays literal: <script>alert(1)</script>',
+      '```',
+      '',
+      '> All suites pass.',
+      '',
+      'See [the notes](https://example.test/notes) for details.',
+    ].join('\n'),
   ],
   [
     'Now make subagents children of the task.',
-    'Implemented the hierarchy. Subagents attach under the parent task, never create projects, and their completion never finishes the parent.',
+    [
+      'Implemented the hierarchy:',
+      '',
+      '1. Subagents attach under the parent task',
+      '2. They never create projects',
+      '3. Their completion never finishes the parent',
+    ].join('\n'),
   ],
   [
     'Add conversation-aware tasks.',
-    'Conversation capture is in place: prompts and visible responses are stored on Windows and read by the PWA over the authenticated /api route.',
+    'Conversation capture is in place: prompts and visible responses are stored on Windows and read by the PWA over the authenticated `/api` route.',
   ],
 ];
 

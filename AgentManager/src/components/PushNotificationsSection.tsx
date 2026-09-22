@@ -1,13 +1,22 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { useNotificationService, useNotificationStatus } from '../services/notifications';
+import {
+  loadNotificationPreferences,
+  type NotificationPreferences,
+} from '../lib/notificationPreferences';
+import {
+  resendNotificationPreferences,
+  setNotificationPreferences,
+  useNotificationService,
+  useNotificationStatus,
+} from '../services/notifications';
 import { useTheme } from '../theme';
 import { Button } from './Button';
 import { Card } from './Card';
 import { SectionHeader } from './SectionHeader';
-import { InfoRow } from './SettingsRow';
+import { InfoRow, ToggleRow } from './SettingsRow';
 
 /**
  * Web Push status and the one control that turns it on.
@@ -28,6 +37,7 @@ export function PushNotificationsSection() {
   const service = useNotificationService();
   const status = useNotificationStatus();
   const [phase, setPhase] = useState<Phase>('idle');
+  const [preferences, setPreferences] = useState<NotificationPreferences>(loadNotificationPreferences);
   const [detail, setDetail] = useState<string | null>(null);
 
   const isWeb = Platform.OS === 'web';
@@ -91,6 +101,20 @@ export function PushNotificationsSection() {
       : permission === 'denied'
         ? 'Denied'
         : 'Not requested';
+
+  // Keep the relay's copy in step with this device's choice: on open, and
+  // again the moment registration completes. Best effort; the local choice is
+  // authoritative for the toggle either way.
+  useEffect(() => {
+    if (!registered) return;
+    void resendNotificationPreferences();
+  }, [registered]);
+
+  const onToggleSubtaskPush = useCallback((next: boolean) => {
+    const updated: NotificationPreferences = { subtaskCompletionPush: next };
+    setPreferences(updated);
+    void setNotificationPreferences(updated);
+  }, []);
 
   const showButton = isWeb && !registered && permission !== 'denied';
 
@@ -158,6 +182,29 @@ export function PushNotificationsSection() {
           />
         ) : null}
       </Card>
+
+      <View style={styles.action}>
+        <Card padded={false}>
+          <ToggleRow
+            icon="git-branch-outline"
+            label="Subtask completion notifications"
+            description="Notify me when a subtask or subagent finishes."
+            value={preferences.subtaskCompletionPush}
+            onValueChange={onToggleSubtaskPush}
+            isLast
+          />
+        </Card>
+        <Text
+          style={[
+            theme.typography.caption,
+            { color: theme.colors.textTertiary, marginTop: 8, lineHeight: 18 },
+          ]}
+        >
+          Off suppresses only the &ldquo;Subtask completed&rdquo; push. Task completions, and
+          anything needing your approval, input or attention, still notify you, and subagents
+          keep appearing under Agent activity.
+        </Text>
+      </View>
 
       {showButton ? (
         <View style={styles.action}>

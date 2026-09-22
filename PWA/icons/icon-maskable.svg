@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Maskable variant of icon.svg: mark scaled to 72% and centred in the safe zone. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#14141A"/>
+  <g transform="translate(256 256) scale(0.72) translate(-256 -256)">
+    <g stroke="#2E2E38" stroke-width="12" stroke-linecap="round">
+      <line x1="256" y1="256" x2="256" y2="132"/>
+      <line x1="256" y1="256" x2="363" y2="318"/>
+      <line x1="256" y1="256" x2="149" y2="318"/>
+    </g>
+    <circle cx="256" cy="256" r="58" fill="#8B85F5"/>
+    <circle cx="256" cy="132" r="34" fill="#E3A857"/>
+    <circle cx="363" cy="318" r="34" fill="#6E6E7A"/>
+    <circle cx="149" cy="318" r="34" fill="#6E6E7A"/>
+  </g>
+</svg>

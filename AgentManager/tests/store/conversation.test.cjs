@@ -294,3 +294,84 @@ test('status events carry no conversation text and the hierarchy/lifecycle rules
   assert.equal(s.tasks.length, 1);
   assert.equal(JSON.stringify(s.events).includes('text'), false);
 });
+
+/* ------------------------------------------------ newest-first display order */
+
+test('Conversation is displayed newest first while storage stays chronological', () => {
+  let s = ingest(EMPTY, event('running', 0, A));
+  s = setConv(s, conversation(A, [
+    msg(A, 'user', PROMPT1, 1, { title: TITLE1 }),
+    msg(A, 'assistant', ANSWER1, 2),
+    msg(A, 'user', 'Second prompt', 3),
+    msg(A, 'assistant', 'Second answer', 4),
+  ]));
+
+  // Stored / fetched order is untouched: oldest first.
+  assert.deepEqual(
+    sel.conversationFor(s.conversations, A).map((m) => m.text.slice(0, 13)),
+    ['Fix the push ', 'Implemented t', 'Second prompt', 'Second answer'],
+  );
+  // Display order is the reverse: the latest turn is first on the screen.
+  assert.deepEqual(
+    sel.conversationForDisplay(s.conversations, A).map((m) => [m.role, m.text.slice(0, 13)]),
+    [
+      ['assistant', 'Second answer'],
+      ['user', 'Second prompt'],
+      ['assistant', 'Implemented t'],
+      ['user', 'Fix the push '],
+    ],
+  );
+  // Same records, same ids, same timestamps: only the order differs.
+  const stored = sel.conversationFor(s.conversations, A);
+  const shown = sel.conversationForDisplay(s.conversations, A);
+  assert.deepEqual(shown.map((m) => m.messageId), [...stored.map((m) => m.messageId)].reverse());
+  assert.equal(shown[0], stored[stored.length - 1], 'the very same record object');
+  assert.deepEqual(shown.map((m) => m.timestamp), [...stored.map((m) => m.timestamp)].reverse());
+  // Reversing must not mutate the cached conversation.
+  assert.deepEqual(sel.conversationFor(s.conversations, A).map((m) => m.text.slice(0, 13)), [
+    'Fix the push ', 'Implemented t', 'Second prompt', 'Second answer',
+  ]);
+});
+
+test('an existing conversation captured earlier also renders newest first', () => {
+  // A conversation fetched from Windows exactly as the relay stores it.
+  let s = ingest(EMPTY, event('running', 0, A));
+  const many = [];
+  for (let i = 0; i < 9; i += 1) many.push(msg(A, i % 2 ? 'assistant' : 'user', `turn ${i}`, i, i === 0 ? { title: TITLE1 } : {}));
+  s = setConv(s, conversation(A, many));
+  const shown = sel.conversationForDisplay(s.conversations, A);
+  assert.equal(shown.length, 9);
+  assert.equal(shown[0].text, 'turn 8');
+  assert.equal(shown[8].text, 'turn 0');
+  assert.equal(task(s, A).autoTitle, TITLE1, 'the title still comes from the first turn');
+});
+
+test('a newly received message appears at the top without disturbing the rest', () => {
+  let s = ingest(EMPTY, event('running', 0, A));
+  const first = msg(A, 'user', PROMPT1, 1, { title: TITLE1 });
+  const reply = msg(A, 'assistant', ANSWER1, 2);
+  s = setConv(s, conversation(A, [first, reply]));
+  assert.equal(sel.conversationForDisplay(s.conversations, A)[0].text, ANSWER1);
+
+  // The screen is open and a new turn arrives on the next fetch.
+  const fresh = msg(A, 'assistant', 'A brand new answer', 3);
+  s = setConv(s, conversation(A, [first, reply, fresh]));
+  const shown = sel.conversationForDisplay(s.conversations, A);
+  assert.equal(shown[0].text, 'A brand new answer', 'newest is first');
+  assert.equal(shown[0].messageId, fresh.messageId);
+  assert.deepEqual(shown.slice(1).map((m) => m.text), [ANSWER1, PROMPT1], 'older turns keep their order below');
+  // "Latest output" and the top bubble are the same record.
+  assert.equal(sel.latestOutputFor(s.conversations, A).messageId, shown[0].messageId);
+});
+
+test('display order never mixes a child thread into the parent', () => {
+  let s = ingest(EMPTY, event('running', 0, A));
+  s = ingest(s, event('running', 1, A, { subtaskId: A1, agentType: 'Explore' }));
+  s = setConv(s, conversation(A, [msg(A, 'user', PROMPT1, 0, { title: TITLE1 }), msg(A, 'assistant', ANSWER1, 5)], {
+    children: { [A1]: { messages: [msg(A, 'assistant', 'Child output', 9, { subtaskId: A1 })], trimmed: 0 } },
+  }));
+  const shown = sel.conversationForDisplay(s.conversations, A);
+  assert.equal(shown.length, 2);
+  assert.equal(shown.some((m) => m.text === 'Child output'), false, 'the newer child turn stays under the child');
+  assert.equal(sel.childOutputFor(s.conversations, A, A1).text, 'Child output');
+});

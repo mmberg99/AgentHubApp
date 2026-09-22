@@ -6,6 +6,7 @@ export * from './Card';
 export * from './EmptyState';
 export * from './EventRow';
 export * from './FilterBar';
+export * from './Markdown';
 export * from './MessageBubble';
 export * from './ProjectCard';
 export * from './PushNotificationsSection';
